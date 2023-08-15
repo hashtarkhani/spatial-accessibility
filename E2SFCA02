@@ -1,0 +1,175 @@
+
+import arcpy
+from sys import argv
+
+def E2SFCAdb1(Provider_Data, Provider_ID_Field, Capacity_Field, Population_data, Population_ID_Field, Population_Field, Per_Capita=100000, Weight1=1, Weight2=0.68, Weight3=0.22, Provider_Catchment_Area_Layer, Population_Catchment_Area_Layer, Output_File):  # Enhanced Two Step Floating Catchment Area (using travel time catchments)
+
+    # To allow overwriting outputs change overwriteOutput option to True.
+    arcpy.env.overwriteOutput = False
+
+
+    # Process: Copy Features (4) (Copy Features) (management)
+    Population_copy = "in_memory\\Population_copy"
+    arcpy.management.CopyFeatures(in_features=Population_data.__str__().format(**locals(),**globals()), out_feature_class=Population_copy)
+
+    # Process: Add Fields (multiple) (2) (Add Fields (multiple)) (management)
+    Population_copy_9_ = arcpy.management.AddFields(in_table=Population_copy, field_description=[["zPop_id", "LONG", "", "", "", ""], ["zPop_field1", "DOUBLE", "", "", "", ""], ["zPop_field2", "DOUBLE", "", "", "", ""], ["zPop_field3", "DOUBLE", "", "", "", ""], ["FinalIndex", "DOUBLE", "finalindex", "", "", ""]])[0]
+
+    # Process: Calculate Fields (multiple) (Calculate Fields (multiple)) (management)
+    Population_copy_7_ = arcpy.management.CalculateFields(in_table=Population_copy_9_, expression_type="PYTHON3", fields=[["zPop_field1", f"!{Population_Field}!", ""], ["zPop_field2", f"!{Population_Field}!", ""], ["zPop_field3", f"!{Population_Field}!", ""], ["zPop_id", f"!{Population_ID_Field}!", ""]])[0]
+
+    # Process: Copy Features (6) (Copy Features) (management)
+    Population_TT_Catchments_Copy = "in_memory\\Population_TT_Catchments_Copy"
+    arcpy.management.CopyFeatures(in_features=Population_Catchment_Area_Layer.__str__().format(**locals(),**globals()), out_feature_class=Population_TT_Catchments_Copy)
+
+    # Process: Add Fields (multiple) (4) (Add Fields (multiple)) (management)
+    Population_TT_Catchment_copy = arcpy.management.AddFields(in_table=Population_TT_Catchments_Copy, field_description=[["zPopulationBuffID", "LONG", "ZPopulationBuffID", "", "", ""]])[0]
+
+    # Process: Calculate Fields (multiple) (4) (Calculate Fields (multiple)) (management)
+    Provider_Catchments_Copy_2_ = arcpy.management.CalculateFields(in_table=Population_TT_Catchment_copy, expression_type="PYTHON3", fields=[["zPopulationBuffID", f"!{Population_ID_Field}!", ""]])[0]
+
+    # Process: Select pop By Attribute (1) (Select Layer By Attribute) (management)
+    Population_TT_Catchments_Ring1, Count_4_ = arcpy.management.SelectLayerByAttribute(in_layer_or_view=Provider_Catchments_Copy_2_, where_clause="RING = 1")
+
+    # Process: Copy Features (Copy Features) (management)
+    HealthServices_copy = "in_memory\\HealthServices_copy"
+    arcpy.management.CopyFeatures(in_features=Provider_Data.__str__().format(**locals(),**globals()), out_feature_class=HealthServices_copy)
+
+    # Process: Add Fields (multiple) (Add Fields (multiple)) (management)
+    HealthServices_copy_4_ = arcpy.management.AddFields(in_table=HealthServices_copy, field_description=[["zServiceID", "LONG", "zserviceid", "", "", ""], ["zCapacity_copy", "DOUBLE", "zcapacity_copy", "", "", ""], ["ProtoPop1", "DOUBLE", "protopop1", "", "", ""], ["ProtoPop2", "DOUBLE", "protopop2", "", "", ""], ["ProtoPop3", "DOUBLE", "protopop3", "", "", ""]])[0]
+
+    # Process: Calculate Fields (multiple) (5) (Calculate Fields (multiple)) (management)
+    HealthServices_copy_5_ = arcpy.management.CalculateFields(in_table=HealthServices_copy_4_, expression_type="PYTHON3", fields=[["zServiceID", f"!{Provider_ID_Field}!", ""], ["zCapacity_copy", f"!{Capacity_Field}!", ""]])[0]
+
+    # Process: Copy Features (5) (Copy Features) (management)
+    Provider_TT_Catchments_Copy = "in_memory\\Provider_TT_Catchments_Copy"
+    arcpy.management.CopyFeatures(in_features=Provider_Catchment_Area_Layer.__str__().format(**locals(),**globals()), out_feature_class=Provider_TT_Catchments_Copy)
+
+    # Process: Add Fields (multiple) (3) (Add Fields (multiple)) (management)
+    Provider_TTBuff_copy_2 = arcpy.management.AddFields(in_table=Provider_TT_Catchments_Copy, field_description=[["zProviderBuffID", "LONG", "ZProviderBuffID", "", "", ""]])[0]
+
+    # Process: Calculate Fields (multiple) (3) (Calculate Fields (multiple)) (management)
+    Provider_Data_Copy = arcpy.management.CalculateFields(in_table=Provider_TTBuff_copy_2, expression_type="PYTHON3", fields=[["zProviderBuffID", f"!{Provider_ID_Field}!", ""]])[0]
+
+    # Process: Select Layer By Attribute (Select Layer By Attribute) (management)
+    Provider_TT_Catchments_R1, Count = arcpy.management.SelectLayerByAttribute(in_layer_or_view=Provider_Data_Copy, where_clause="RING = 1")
+
+    # Process: Feature To Point (Feature To Point) (management)
+    Population_Points = "in_memory\\PopCentroid"
+    arcpy.management.FeatureToPoint(in_features=Population_copy_7_, out_feature_class=Population_Points)
+
+    # Process: Spatial Join (Spatial Join) (analysis)
+    Provider_TT_Catc_SpatialJoin = "C:\\Users\\shashtar\\Desktop\\USA GIS files\\Mxds\\AccessDialysis\\MyProject3\\MyProject3.gdb\\Provider_TT_Catc_SpatialJoin"
+    arcpy.analysis.SpatialJoin(target_features=Provider_TT_Catchments_R1, join_features=Population_Points, out_feature_class=Provider_TT_Catc_SpatialJoin, field_mapping="AREA_ID \"AREA_ID\" true true false 10 Text 0 0,First,#,Provider_TT_Catchments_Copy_,AREA_ID,0,10;AREA_DESC \"AREA_DESC\" true true false 40 Text 0 0,First,#,Provider_TT_Catchments_Copy_,AREA_DESC,0,40;AREA_DESC2 \"AREA_DESC2\" true true false 40 Text 0 0,First,#,Provider_TT_Catchments_Copy_,AREA_DESC2,0,40;AREA_DESC3 \"AREA_DESC3\" true true false 254 Text 0 0,First,#,Provider_TT_Catchments_Copy_,AREA_DESC3,0,254;RING \"RING\" true true false 10 Long 0 10,First,#,Provider_TT_Catchments_Copy_,RING,-1,-1;RING_DEFN \"RING_DEFN\" true true false 20 Text 0 0,First,#,Provider_TT_Catchments_Copy_,RING_DEFN,0,20;STORE_LAT \"STORE_LAT\" true true false 19 Double 0 0,First,#,Provider_TT_Catchments_Copy_,STORE_LAT,-1,-1;STORE_LON \"STORE_LON\" true true false 19 Double 0 0,First,#,Provider_TT_Catchments_Copy_,STORE_LON,-1,-1;Capacity \"Capacity\" true true false 10 Long 0 10,First,#,Provider_TT_Catchments_Copy_,Capacity,-1,-1;ID \"ID\" true true false 10 Long 0 10,First,#,Provider_TT_Catchments_Copy_,ID,-1,-1;zProviderBuffID \"ZProviderBuffID\" true true false 0 Long 0 0,First,#,Provider_TT_Catchments_Copy_,zProviderBuffID,-1,-1;GEOID \"GEOID\" true true false 11 Text 0 0,First,#,in_memory\\PopCentroid,GEOID,0,11;Totalpop \"Totalpop\" true true false 10 Long 0 10,First,#,in_memory\\PopCentroid,Totalpop,-1,-1;WeightedPo \"WeightedPo\" true true false 10 Long 0 10,First,#,in_memory\\PopCentroid,WeightedPo,-1,-1;zPop_id \"zPop_id\" true true false 0 Long 0 0,First,#,in_memory\\PopCentroid,zPop_id,-1,-1;zPop_field1 \"zPop_field1\" true true false 0 Double 0 0,Sum,#,in_memory\\PopCentroid,zPop_field1,-1,-1;zPop_field2 \"zPop_field2\" true true false 0 Double 0 0,First,#,in_memory\\PopCentroid,zPop_field2,-1,-1;zPop_field3 \"zPop_field3\" true true false 0 Double 0 0,First,#,in_memory\\PopCentroid,zPop_field3,-1,-1;FinalIndex \"finalindex\" true true false 0 Double 0 0,First,#,in_memory\\PopCentroid,FinalIndex,-1,-1;ORIG_FID \"ORIG_FID\" true true false 0 Long 0 0,First,#,in_memory\\PopCentroid,ORIG_FID,-1,-1")
+
+    # Process: Join Field (Join Field) (management)
+    HealthServices_copy_8_ = arcpy.management.JoinField(in_data=HealthServices_copy_5_, in_field="zServiceID", join_table=Provider_TT_Catc_SpatialJoin, join_field="zProviderBuffID", fields=["zPop_field1"])[0]
+
+    # Process: Select Layer By Attribute (2) (Select Layer By Attribute) (management)
+    Provider_TT_Catchments_R1_2_, Count_2_ = arcpy.management.SelectLayerByAttribute(in_layer_or_view=Provider_Data_Copy, where_clause="RING = 1")
+
+    # Process: Spatial Join (4) (Spatial Join) (analysis)
+    Provider_TT_Catc_SpatialJoin1 = "C:\\Users\\shashtar\\Desktop\\USA GIS files\\Mxds\\AccessDialysis\\MyProject3\\MyProject3.gdb\\Provider_TT_Catc_SpatialJoin1"
+    arcpy.analysis.SpatialJoin(target_features=Provider_TT_Catchments_R1_2_, join_features=Population_Points, out_feature_class=Provider_TT_Catc_SpatialJoin1, field_mapping="AREA_ID \"AREA_ID\" true true false 10 Text 0 0,First,#,Provider_TT_Catchments_Copy_,AREA_ID,0,10;AREA_DESC \"AREA_DESC\" true true false 40 Text 0 0,First,#,Provider_TT_Catchments_Copy_,AREA_DESC,0,40;AREA_DESC2 \"AREA_DESC2\" true true false 40 Text 0 0,First,#,Provider_TT_Catchments_Copy_,AREA_DESC2,0,40;AREA_DESC3 \"AREA_DESC3\" true true false 254 Text 0 0,First,#,Provider_TT_Catchments_Copy_,AREA_DESC3,0,254;RING \"RING\" true true false 10 Long 0 10,First,#,Provider_TT_Catchments_Copy_,RING,-1,-1;RING_DEFN \"RING_DEFN\" true true false 20 Text 0 0,First,#,Provider_TT_Catchments_Copy_,RING_DEFN,0,20;STORE_LAT \"STORE_LAT\" true true false 19 Double 0 0,First,#,Provider_TT_Catchments_Copy_,STORE_LAT,-1,-1;STORE_LON \"STORE_LON\" true true false 19 Double 0 0,First,#,Provider_TT_Catchments_Copy_,STORE_LON,-1,-1;Capacity \"Capacity\" true true false 10 Long 0 10,First,#,Provider_TT_Catchments_Copy_,Capacity,-1,-1;ID \"ID\" true true false 10 Long 0 10,First,#,Provider_TT_Catchments_Copy_,ID,-1,-1;zProviderBuffID \"ZProviderBuffID\" true true false 0 Long 0 0,First,#,Provider_TT_Catchments_Copy_,zProviderBuffID,-1,-1;GEOID \"GEOID\" true true false 11 Text 0 0,First,#,in_memory\\PopCentroid,GEOID,0,11;Totalpop \"Totalpop\" true true false 10 Long 0 10,First,#,in_memory\\PopCentroid,Totalpop,-1,-1;WeightedPo \"WeightedPo\" true true false 10 Long 0 10,First,#,in_memory\\PopCentroid,WeightedPo,-1,-1;zPop_id \"zPop_id\" true true false 0 Long 0 0,First,#,in_memory\\PopCentroid,zPop_id,-1,-1;zPop_field1 \"zPop_field1\" true true false 0 Double 0 0,First,#,in_memory\\PopCentroid,zPop_field1,-1,-1;zPop_field2 \"zPop_field2\" true true false 0 Double 0 0,Sum,#,in_memory\\PopCentroid,zPop_field2,-1,-1;zPop_field3 \"zPop_field3\" true true false 0 Double 0 0,First,#,in_memory\\PopCentroid,zPop_field3,-1,-1;FinalIndex \"finalindex\" true true false 0 Double 0 0,First,#,in_memory\\PopCentroid,FinalIndex,-1,-1;ORIG_FID \"ORIG_FID\" true true false 0 Long 0 0,First,#,in_memory\\PopCentroid,ORIG_FID,-1,-1")
+
+    # Process: Join Field (3) (Join Field) (management)
+    HealthServices_copy_7_ = arcpy.management.JoinField(in_data=HealthServices_copy_8_, in_field="zServiceID", join_table=Provider_TT_Catc_SpatialJoin1, join_field="zProviderBuffID", fields=["zPop_field2"])[0]
+
+    # Process: Select Layer By Attribute (3) (Select Layer By Attribute) (management)
+    Provider_TT_Catchments_R1_3_, Count_3_ = arcpy.management.SelectLayerByAttribute(in_layer_or_view=Provider_Data_Copy, where_clause="RING = 1")
+
+    # Process: Spatial Join (5) (Spatial Join) (analysis)
+    PopCentroid_SpatialJoin = "C:\\Users\\shashtar\\Desktop\\USA GIS files\\Mxds\\AccessDialysis\\MyProject3\\MyProject3.gdb\\PopCentroid_SpatialJoin"
+    arcpy.analysis.SpatialJoin(target_features=Provider_TT_Catchments_R1_3_, join_features=Population_Points, out_feature_class=PopCentroid_SpatialJoin, field_mapping="AREA_ID \"AREA_ID\" true true false 10 Text 0 0,First,#,Provider_TT_Catchments_Copy_,AREA_ID,0,10;AREA_DESC \"AREA_DESC\" true true false 40 Text 0 0,First,#,Provider_TT_Catchments_Copy_,AREA_DESC,0,40;AREA_DESC2 \"AREA_DESC2\" true true false 40 Text 0 0,First,#,Provider_TT_Catchments_Copy_,AREA_DESC2,0,40;AREA_DESC3 \"AREA_DESC3\" true true false 254 Text 0 0,First,#,Provider_TT_Catchments_Copy_,AREA_DESC3,0,254;RING \"RING\" true true false 10 Long 0 10,First,#,Provider_TT_Catchments_Copy_,RING,-1,-1;RING_DEFN \"RING_DEFN\" true true false 20 Text 0 0,First,#,Provider_TT_Catchments_Copy_,RING_DEFN,0,20;STORE_LAT \"STORE_LAT\" true true false 19 Double 0 0,First,#,Provider_TT_Catchments_Copy_,STORE_LAT,-1,-1;STORE_LON \"STORE_LON\" true true false 19 Double 0 0,First,#,Provider_TT_Catchments_Copy_,STORE_LON,-1,-1;Capacity \"Capacity\" true true false 10 Long 0 10,First,#,Provider_TT_Catchments_Copy_,Capacity,-1,-1;ID \"ID\" true true false 10 Long 0 10,First,#,Provider_TT_Catchments_Copy_,ID,-1,-1;zProviderBuffID \"ZProviderBuffID\" true true false 0 Long 0 0,First,#,Provider_TT_Catchments_Copy_,zProviderBuffID,-1,-1;GEOID \"GEOID\" true true false 11 Text 0 0,First,#,in_memory\\PopCentroid,GEOID,0,11;Totalpop \"Totalpop\" true true false 10 Long 0 10,First,#,in_memory\\PopCentroid,Totalpop,-1,-1;WeightedPo \"WeightedPo\" true true false 10 Long 0 10,First,#,in_memory\\PopCentroid,WeightedPo,-1,-1;zPop_id \"zPop_id\" true true false 0 Long 0 0,First,#,in_memory\\PopCentroid,zPop_id,-1,-1;zPop_field1 \"zPop_field1\" true true false 0 Double 0 0,First,#,in_memory\\PopCentroid,zPop_field1,-1,-1;zPop_field2 \"zPop_field2\" true true false 0 Double 0 0,First,#,in_memory\\PopCentroid,zPop_field2,-1,-1;zPop_field3 \"zPop_field3\" true true false 0 Double 0 0,Sum,#,in_memory\\PopCentroid,zPop_field3,-1,-1;FinalIndex \"finalindex\" true true false 0 Double 0 0,First,#,in_memory\\PopCentroid,FinalIndex,-1,-1;ORIG_FID \"ORIG_FID\" true true false 0 Long 0 0,First,#,in_memory\\PopCentroid,ORIG_FID,-1,-1")
+
+    # Process: Join Field (4) (Join Field) (management)
+    HealthServices_copy_3_ = arcpy.management.JoinField(in_data=HealthServices_copy_7_, in_field="zServiceID", join_table=PopCentroid_SpatialJoin, join_field="zProviderBuffID", fields=["zPop_field3"])[0]
+
+    # Process: Calculate Fields (multiple) (2) (Calculate Fields (multiple)) (management)
+    if int(Per_Capita) and float(Weight1) and float(Weight2) and float(Weight3):
+        HealthServices_copy_2_ = arcpy.management.CalculateFields(in_table=HealthServices_copy_3_, expression_type="PYTHON3", fields=[["ProtoPop1", f"!zCapacity_copy! * {Per_Capita} / FUN (!zPop_field1! , !zPop_field2! , !zPop_field3!, {Weight1},{Weight2},{Weight3})", ""], ["ProtoPop2", f"!zCapacity_copy! * {Per_Capita} / FUN (!zPop_field1! , !zPop_field2! , !zPop_field3!, {Weight1},{Weight2},{Weight3})", ""], ["ProtoPop3", f"!zCapacity_copy! * {Per_Capita} / FUN (!zPop_field1! , !zPop_field2! , !zPop_field3!, {Weight1},{Weight2},{Weight3})", ""]], code_block="""def FUN(pop1, pop2, pop3, w1, w2, w3):
+    pop1 = 0 if pop1 is None else pop1
+    pop2 = 0 if pop2 is None else pop2
+    pop3 = 0 if pop3 is None else pop3
+
+    term1 = w1 * pop1
+    term2 = w2 * (pop2 - pop1)
+    term3 = w3 * (pop3 - pop2)
+
+    return term1 + term2 + term3""")[0]
+
+    # Process: Copy Features (2) (Copy Features) (management)
+    First_Step_output = "in_memory\\HealthServices_Exported"
+    if int(Per_Capita) and float(Weight1) and float(Weight2) and float(Weight3):
+        arcpy.management.CopyFeatures(in_features=HealthServices_copy_2_, out_feature_class=First_Step_output)
+
+    # Process: Spatial Join (2) (Spatial Join) (analysis)
+    Population_TT_Ca_SpatialJoin = "C:\\Users\\shashtar\\Desktop\\USA GIS files\\Mxds\\AccessDialysis\\MyProject3\\MyProject3.gdb\\Population_TT_Ca_SpatialJoin"
+    if int(Per_Capita) and float(Weight1) and float(Weight2) and float(Weight3):
+        arcpy.analysis.SpatialJoin(target_features=Population_TT_Catchments_Ring1, join_features=First_Step_output, out_feature_class=Population_TT_Ca_SpatialJoin, field_mapping="AREA_ID \"AREA_ID\" true true false 10 Text 0 0,First,#,Population_TT_Catchments_Cop,AREA_ID,0,10;AREA_DESC \"AREA_DESC\" true true false 40 Text 0 0,First,#,Population_TT_Catchments_Cop,AREA_DESC,0,40;AREA_DESC2 \"AREA_DESC2\" true true false 40 Text 0 0,First,#,Population_TT_Catchments_Cop,AREA_DESC2,0,40;AREA_DESC3 \"AREA_DESC3\" true true false 254 Text 0 0,First,#,Population_TT_Catchments_Cop,AREA_DESC3,0,254;RING \"RING\" true true false 10 Long 0 10,First,#,Population_TT_Catchments_Cop,RING,-1,-1;RING_DEFN \"RING_DEFN\" true true false 20 Text 0 0,First,#,Population_TT_Catchments_Cop,RING_DEFN,0,20;STORE_LAT \"STORE_LAT\" true true false 19 Double 0 0,First,#,Population_TT_Catchments_Cop,STORE_LAT,-1,-1;STORE_LON \"STORE_LON\" true true false 19 Double 0 0,First,#,Population_TT_Catchments_Cop,STORE_LON,-1,-1;GEOID \"GEOID\" true true false 11 Text 0 0,First,#,Population_TT_Catchments_Cop,GEOID,0,11;Totalpop \"Totalpop\" true true false 10 Long 0 10,First,#,Population_TT_Catchments_Cop,Totalpop,-1,-1;WeightedPo \"WeightedPo\" true true false 10 Long 0 10,First,#,Population_TT_Catchments_Cop,WeightedPo,-1,-1;PopID \"PopID\" true true false 10 Long 0 10,First,#,Population_TT_Catchments_Cop,PopID,-1,-1;ORIG_FID \"ORIG_FID\" true true false 10 Long 0 10,First,#,Population_TT_Catchments_Cop,ORIG_FID,-1,-1;zPopulationBuffID \"ZPopulationBuffID\" true true false 0 Long 0 0,First,#,Population_TT_Catchments_Cop,zPopulationBuffID,-1,-1;Capacity \"Capacity\" true true false 10 Long 0 10,First,#,in_memory\\HealthServices_Exported,Capacity,-1,-1;zServiceID \"zserviceid\" true true false 0 Long 0 0,First,#,in_memory\\HealthServices_Exported,zServiceID,-1,-1;zCapacity_copy \"zcapacity_copy\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,zCapacity_copy,-1,-1;ProtoPop1 \"protopop1\" true true false 0 Double 0 0,Sum,#,in_memory\\HealthServices_Exported,ProtoPop1,-1,-1;ProtoPop2 \"protopop2\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,ProtoPop2,-1,-1;ProtoPop3 \"protopop3\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,ProtoPop3,-1,-1;zPop_field1 \"zPop_field1\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,zPop_field1,-1,-1;zPop_field2 \"zPop_field2\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,zPop_field2,-1,-1;zPop_field3 \"zPop_field3\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,zPop_field3,-1,-1")
+
+    # Process: Join Field (2) (Join Field) (management)
+    if int(Per_Capita) and float(Weight1) and float(Weight2) and float(Weight3):
+        Population_copy_8_ = arcpy.management.JoinField(in_data=Population_copy_7_, in_field="zPop_id", join_table=Population_TT_Ca_SpatialJoin, join_field="zPopulationBuffID", fields=["ProtoPop1"])[0]
+
+    # Process: Select pop By Attribute (2) (Select Layer By Attribute) (management)
+    Population_TT_Catchments_Ring2, Count_5_ = arcpy.management.SelectLayerByAttribute(in_layer_or_view=Provider_Catchments_Copy_2_, where_clause="RING = 2")
+
+    # Process: Spatial Join (3) (Spatial Join) (analysis)
+    Population_TT_Ca_SpatialJoin1 = "C:\\Users\\shashtar\\Desktop\\USA GIS files\\Mxds\\AccessDialysis\\MyProject3\\MyProject3.gdb\\Population_TT_Ca_SpatialJoin1"
+    if int(Per_Capita) and float(Weight1) and float(Weight2) and float(Weight3):
+        arcpy.analysis.SpatialJoin(target_features=Population_TT_Catchments_Ring2, join_features=First_Step_output, out_feature_class=Population_TT_Ca_SpatialJoin1, field_mapping="AREA_ID \"AREA_ID\" true true false 10 Text 0 0,First,#,Population_TT_Catchments_Cop1,AREA_ID,0,10;AREA_DESC \"AREA_DESC\" true true false 40 Text 0 0,First,#,Population_TT_Catchments_Cop1,AREA_DESC,0,40;AREA_DESC2 \"AREA_DESC2\" true true false 40 Text 0 0,First,#,Population_TT_Catchments_Cop1,AREA_DESC2,0,40;AREA_DESC3 \"AREA_DESC3\" true true false 254 Text 0 0,First,#,Population_TT_Catchments_Cop1,AREA_DESC3,0,254;RING \"RING\" true true false 10 Long 0 10,First,#,Population_TT_Catchments_Cop1,RING,-1,-1;RING_DEFN \"RING_DEFN\" true true false 20 Text 0 0,First,#,Population_TT_Catchments_Cop1,RING_DEFN,0,20;STORE_LAT \"STORE_LAT\" true true false 19 Double 0 0,First,#,Population_TT_Catchments_Cop1,STORE_LAT,-1,-1;STORE_LON \"STORE_LON\" true true false 19 Double 0 0,First,#,Population_TT_Catchments_Cop1,STORE_LON,-1,-1;GEOID \"GEOID\" true true false 11 Text 0 0,First,#,Population_TT_Catchments_Cop1,GEOID,0,11;Totalpop \"Totalpop\" true true false 10 Long 0 10,First,#,Population_TT_Catchments_Cop1,Totalpop,-1,-1;WeightedPo \"WeightedPo\" true true false 10 Long 0 10,First,#,Population_TT_Catchments_Cop1,WeightedPo,-1,-1;PopID \"PopID\" true true false 10 Long 0 10,First,#,Population_TT_Catchments_Cop1,PopID,-1,-1;ORIG_FID \"ORIG_FID\" true true false 10 Long 0 10,First,#,Population_TT_Catchments_Cop1,ORIG_FID,-1,-1;zPopulationBuffID \"ZPopulationBuffID\" true true false 0 Long 0 0,First,#,Population_TT_Catchments_Cop1,zPopulationBuffID,-1,-1;Capacity \"Capacity\" true true false 10 Long 0 10,First,#,in_memory\\HealthServices_Exported,Capacity,-1,-1;zServiceID \"zserviceid\" true true false 0 Long 0 0,First,#,in_memory\\HealthServices_Exported,zServiceID,-1,-1;zCapacity_copy \"zcapacity_copy\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,zCapacity_copy,-1,-1;ProtoPop1 \"protopop1\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,ProtoPop1,-1,-1;ProtoPop2 \"protopop2\" true true false 0 Double 0 0,Sum,#,in_memory\\HealthServices_Exported,ProtoPop2,-1,-1;ProtoPop3 \"protopop3\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,ProtoPop3,-1,-1;zPop_field1 \"zPop_field1\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,zPop_field1,-1,-1;zPop_field2 \"zPop_field2\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,zPop_field2,-1,-1;zPop_field3 \"zPop_field3\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,zPop_field3,-1,-1")
+
+    # Process: Join Field (5) (Join Field) (management)
+    if int(Per_Capita) and float(Weight1) and float(Weight2) and float(Weight3):
+        Population_copy_4_ = arcpy.management.JoinField(in_data=Population_copy_8_, in_field="zPop_id", join_table=Population_TT_Ca_SpatialJoin1, join_field="zPopulationBuffID", fields=["ProtoPop2"])[0]
+
+    # Process: Select pop By Attribute (3) (Select Layer By Attribute) (management)
+    Populatioin_TT_Catchment_Ring3, Count_6_ = arcpy.management.SelectLayerByAttribute(in_layer_or_view=Provider_Catchments_Copy_2_, where_clause="RING = 3")
+
+    # Process: Spatial Join (6) (Spatial Join) (analysis)
+    Population_TT_Ca_SpatialJoin2 = "C:\\Users\\shashtar\\Desktop\\USA GIS files\\Mxds\\AccessDialysis\\MyProject3\\MyProject3.gdb\\Population_TT_Ca_SpatialJoin2"
+    if int(Per_Capita) and float(Weight1) and float(Weight2) and float(Weight3):
+        arcpy.analysis.SpatialJoin(target_features=Populatioin_TT_Catchment_Ring3, join_features=First_Step_output, out_feature_class=Population_TT_Ca_SpatialJoin2, field_mapping="AREA_ID \"AREA_ID\" true true false 10 Text 0 0,First,#,Population_TT_Catchments_Cop2,AREA_ID,0,10;AREA_DESC \"AREA_DESC\" true true false 40 Text 0 0,First,#,Population_TT_Catchments_Cop2,AREA_DESC,0,40;AREA_DESC2 \"AREA_DESC2\" true true false 40 Text 0 0,First,#,Population_TT_Catchments_Cop2,AREA_DESC2,0,40;AREA_DESC3 \"AREA_DESC3\" true true false 254 Text 0 0,First,#,Population_TT_Catchments_Cop2,AREA_DESC3,0,254;RING \"RING\" true true false 10 Long 0 10,First,#,Population_TT_Catchments_Cop2,RING,-1,-1;RING_DEFN \"RING_DEFN\" true true false 20 Text 0 0,First,#,Population_TT_Catchments_Cop2,RING_DEFN,0,20;STORE_LAT \"STORE_LAT\" true true false 19 Double 0 0,First,#,Population_TT_Catchments_Cop2,STORE_LAT,-1,-1;STORE_LON \"STORE_LON\" true true false 19 Double 0 0,First,#,Population_TT_Catchments_Cop2,STORE_LON,-1,-1;GEOID \"GEOID\" true true false 11 Text 0 0,First,#,Population_TT_Catchments_Cop2,GEOID,0,11;Totalpop \"Totalpop\" true true false 10 Long 0 10,First,#,Population_TT_Catchments_Cop2,Totalpop,-1,-1;WeightedPo \"WeightedPo\" true true false 10 Long 0 10,First,#,Population_TT_Catchments_Cop2,WeightedPo,-1,-1;PopID \"PopID\" true true false 10 Long 0 10,First,#,Population_TT_Catchments_Cop2,PopID,-1,-1;ORIG_FID \"ORIG_FID\" true true false 10 Long 0 10,First,#,Population_TT_Catchments_Cop2,ORIG_FID,-1,-1;zPopulationBuffID \"ZPopulationBuffID\" true true false 0 Long 0 0,First,#,Population_TT_Catchments_Cop2,zPopulationBuffID,-1,-1;Capacity \"Capacity\" true true false 10 Long 0 10,First,#,in_memory\\HealthServices_Exported,Capacity,-1,-1;zServiceID \"zserviceid\" true true false 0 Long 0 0,First,#,in_memory\\HealthServices_Exported,zServiceID,-1,-1;zCapacity_copy \"zcapacity_copy\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,zCapacity_copy,-1,-1;ProtoPop1 \"protopop1\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,ProtoPop1,-1,-1;ProtoPop2 \"protopop2\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,ProtoPop2,-1,-1;ProtoPop3 \"protopop3\" true true false 0 Double 0 0,Sum,#,in_memory\\HealthServices_Exported,ProtoPop3,-1,-1;zPop_field1 \"zPop_field1\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,zPop_field1,-1,-1;zPop_field2 \"zPop_field2\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,zPop_field2,-1,-1;zPop_field3 \"zPop_field3\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,zPop_field3,-1,-1")
+
+    # Process: Join Field (6) (Join Field) (management)
+    if int(Per_Capita) and float(Weight1) and float(Weight2) and float(Weight3):
+        Population_copy_2_ = arcpy.management.JoinField(in_data=Population_copy_4_, in_field="zPop_id", join_table=Population_TT_Ca_SpatialJoin2, join_field="zPopulationBuffID", fields=["ProtoPop3"])[0]
+
+    # Process: Calculate Field (3) (Calculate Field) (management)
+    if int(Per_Capita) and float(Weight1) and float(Weight2) and float(Weight3):
+        Population_copy_3_ = arcpy.management.CalculateField(in_table=Population_copy_2_, field="FinalIndex", expression=f"FUN(!ProtoPop1!,!ProtoPop2!,!ProtoPop3!,{Weight1},{Weight2},{Weight3})", code_block="""def FUN(pop1, pop2, pop3, w1, w2, w3):
+    pop1 = 0 if pop1 is None else pop1
+    pop2 = 0 if pop2 is None else pop2
+    pop3 = 0 if pop3 is None else pop3
+
+    term1 = w1 * pop1
+    term2 = w2 * (pop2 - pop1)
+    term3 = w3 * (pop3 - pop2)
+
+    return term1 + term2 + term3""")[0]
+
+    # Process: Delete Field (Delete Field) (management)
+    if int(Per_Capita) and float(Weight1) and float(Weight2) and float(Weight3):
+        Population_copy_5_ = arcpy.management.DeleteField(in_table=Population_copy_3_, drop_field=["zPop_id", "zPop_field1", "zPop_field2", "zPop_field3"])[0]
+
+    # Process: Copy Features (3) (Copy Features) (management)
+    if int(Per_Capita) and float(Weight1) and float(Weight2) and float(Weight3):
+        arcpy.management.CopyFeatures(in_features=Population_copy_5_, out_feature_class=Output_File.__str__().format(**locals(),**globals()))
+
+    # Process: Get_Field_Value_2_ (Get Field Value) 
+    # Get Field Value Utility is not implemented 
+
+    # Process: Get_Field_Value_4_ (Get Field Value) 
+    # Get Field Value Utility is not implemented 
+
+    # Process: Get_Field_Value (Get Field Value) 
+    # Get Field Value Utility is not implemented 
+
+    # Process: Get_Field_Value_3_ (Get Field Value) 
+    # Get Field Value Utility is not implemented 
+
+if __name__ == '__main__':
+    # Global Environment settings
+    with arcpy.EnvManager():
+        E2SFCAdb1(*argv[1:])
