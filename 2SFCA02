@@ -1,0 +1,107 @@
+
+import arcpy
+from sys import argv
+
+def Classic2SFCA2(Provider_Data, Provider_ID_field, Capacity_Field, Population_data, Population_ID_Field, Population_Field, Provider_TravelTimeBuffer, Population_TravelTimeBuffer, Per_Capita=100000, Output_File):  # Two Step Floating Catchment Area (using travel time catchments)
+
+    # To allow overwriting outputs change overwriteOutput option to True.
+    arcpy.env.overwriteOutput = False
+
+
+    # Process: Copy Features (4) (Copy Features) (management)
+    Population_copy = "in_memory\\Population_copy"
+    arcpy.management.CopyFeatures(in_features=Population_data.__str__().format(**locals(),**globals()), out_feature_class=Population_copy)
+
+    # Process: Add Fields (multiple) (2) (Add Fields (multiple)) (management)
+    Population_copy_2_ = arcpy.management.AddFields(in_table=Population_copy, field_description=[["zPop_id", "LONG", "", "", "", ""], ["zPop_field", "DOUBLE", "", "", "", ""]])[0]
+
+    # Process: Calculate Fields (multiple) (4) (Calculate Fields (multiple)) (management)
+    Population_copy_7_ = arcpy.management.CalculateFields(in_table=Population_copy_2_, expression_type="PYTHON3", fields=[["zPop_id", f"!{Population_ID_Field}!", ""], ["zPop_field", f"!{Population_Field}!", ""]])[0]
+
+    # Process: Copy Features (6) (Copy Features) (management)
+    Population_TT_Buffer1 = "in_memory\\Population_TT_Buffer"
+    arcpy.management.CopyFeatures(in_features=Population_TravelTimeBuffer.__str__().format(**locals(),**globals()), out_feature_class=Population_TT_Buffer1)
+
+    # Process: Add Fields (multiple) (4) (Add Fields (multiple)) (management)
+    Population_TT_Buffer2 = arcpy.management.AddFields(in_table=Population_TT_Buffer1, field_description=[["zPopulationBuffID", "LONG", "ZPopulationBuffID", "", "", ""]])[0]
+
+    # Process: Calculate Fields (multiple) (3) (Calculate Fields (multiple)) (management)
+    if Population_ID_Field:
+        Population_TT_Buffer_2_ = arcpy.management.CalculateFields(in_table=Population_TT_Buffer2, expression_type="PYTHON3", fields=[["zPopulationBuffID", f"!{Population_ID_Field}!", ""]])[0]
+
+    # Process: Copy Features (Copy Features) (management)
+    HealthServices_copy = "in_memory\\HealthServices_copy"
+    arcpy.management.CopyFeatures(in_features=Provider_Data.__str__().format(**locals(),**globals()), out_feature_class=HealthServices_copy)
+
+    # Process: Add Fields (multiple) (Add Fields (multiple)) (management)
+    HealthServices_copy_4_ = arcpy.management.AddFields(in_table=HealthServices_copy, field_description=[["zServiceID", "LONG", "zserviceid", "", "", ""], ["zCapacity_copy", "DOUBLE", "zcapacity_copy", "", "", ""], ["FinalIndex", "DOUBLE", "finalindex", "", "", ""]])[0]
+
+    # Process: Calculate Fields (multiple) (Calculate Fields (multiple)) (management)
+    HealthServices_copy_2_ = arcpy.management.CalculateFields(in_table=HealthServices_copy_4_, expression_type="PYTHON3", fields=[["zServiceID", "!%Provider ID Field%!", ""], ["zCapacity_copy", f"!{Capacity_Field}!", ""]])[0]
+
+    # Process: Copy Features (5) (Copy Features) (management)
+    Provider_TTBuff_copy = "in_memory\\Provider_TTBuff_copy"
+    arcpy.management.CopyFeatures(in_features=Provider_TravelTimeBuffer.__str__().format(**locals(),**globals()), out_feature_class=Provider_TTBuff_copy)
+
+    # Process: Add Fields (multiple) (3) (Add Fields (multiple)) (management)
+    Provider_TTBuff_copy_2 = arcpy.management.AddFields(in_table=Provider_TTBuff_copy, field_description=[["zProviderBuffID", "LONG", "ZProviderBuffID", "", "", ""]])[0]
+
+    # Process: Calculate Fields (multiple) (2) (Calculate Fields (multiple)) (management)
+    if Provider_ID_field:
+        Provider_TravelBuffer1 = arcpy.management.CalculateFields(in_table=Provider_TTBuff_copy_2, expression_type="PYTHON3", fields=[["zProviderBuffID", "!%Provider ID Field%!", ""]])[0]
+
+    # Process: Feature To Point (Feature To Point) (management)
+    Population_Points = "in_memory\\PopCentroid"
+    arcpy.management.FeatureToPoint(in_features=Population_copy_7_, out_feature_class=Population_Points)
+
+    # Process: Spatial Join (Spatial Join) (analysis)
+    HealthServicebuf_SpatialJoined = "in_memory\\HealthServicebuf_SpatialJoined"
+    if Provider_ID_field:
+        arcpy.analysis.SpatialJoin(target_features=Provider_TravelBuffer1, join_features=Population_Points, out_feature_class=HealthServicebuf_SpatialJoined, field_mapping="AREA_ID \"AREA_ID\" true true false 10 Text 0 0,First,#,in_memory\\Provider_TTBuff_copy,AREA_ID,0,10;AREA_DESC \"AREA_DESC\" true true false 40 Text 0 0,First,#,in_memory\\Provider_TTBuff_copy,AREA_DESC,0,40;AREA_DESC2 \"AREA_DESC2\" true true false 40 Text 0 0,First,#,in_memory\\Provider_TTBuff_copy,AREA_DESC2,0,40;AREA_DESC3 \"AREA_DESC3\" true true false 254 Text 0 0,First,#,in_memory\\Provider_TTBuff_copy,AREA_DESC3,0,254;RING \"RING\" true true false 10 Long 0 10,First,#,in_memory\\Provider_TTBuff_copy,RING,-1,-1;RING_DEFN \"RING_DEFN\" true true false 20 Text 0 0,First,#,in_memory\\Provider_TTBuff_copy,RING_DEFN,0,20;STORE_LAT \"STORE_LAT\" true true false 19 Double 0 0,First,#,in_memory\\Provider_TTBuff_copy,STORE_LAT,-1,-1;STORE_LON \"STORE_LON\" true true false 19 Double 0 0,First,#,in_memory\\Provider_TTBuff_copy,STORE_LON,-1,-1;Capacity \"Capacity\" true true false 10 Long 0 10,First,#,in_memory\\Provider_TTBuff_copy,Capacity,-1,-1;ID \"ID\" true true false 10 Long 0 10,First,#,in_memory\\Provider_TTBuff_copy,ID,-1,-1;zProviderBuffID \"ZProviderBuffID\" true true false 0 Long 0 0,First,#,in_memory\\Provider_TTBuff_copy,zProviderBuffID,-1,-1;GEOID \"GEOID\" true true false 11 Text 0 0,First,#,in_memory\\PopCentroid,GEOID,0,11;Totalpop \"Totalpop\" true true false 10 Long 0 10,First,#,in_memory\\PopCentroid,Totalpop,-1,-1;WeightedPo \"WeightedPo\" true true false 10 Long 0 10,First,#,in_memory\\PopCentroid,WeightedPo,-1,-1;zPop_id \"zPop_id\" true true false 0 Long 0 0,First,#,in_memory\\PopCentroid,zPop_id,-1,-1;zPop_field \"zPop_field\" true true false 0 Double 0 0,Sum,#,in_memory\\PopCentroid,zPop_field,-1,-1;ORIG_FID \"ORIG_FID\" true true false 0 Long 0 0,First,#,in_memory\\PopCentroid,ORIG_FID,-1,-1")
+
+    # Process: Join Field (Join Field) (management)
+    if Provider_ID_field:
+        HealthServices_copy_6_ = arcpy.management.JoinField(in_data=HealthServices_copy_2_, in_field="zServiceID", join_table=HealthServicebuf_SpatialJoined, join_field="zProviderBuffID", fields=["zPop_field"])[0]
+
+    # Process: Calculate Field (Calculate Field) (management)
+    if int(Per_Capita) and Provider_ID_field:
+        HealthService_temp1_3_ = arcpy.management.CalculateField(in_table=HealthServices_copy_6_, field="FinalIndex", expression=f"!zCapacity_copy!* {Per_Capita} /!zPop_field!")[0]
+
+    # Process: Copy Features (2) (Copy Features) (management)
+    First_Step_output = "in_memory\\HealthServices_Exported"
+    if int(Per_Capita) and Provider_ID_field:
+        arcpy.management.CopyFeatures(in_features=HealthService_temp1_3_, out_feature_class=First_Step_output)
+
+    # Process: Spatial Join (2) (Spatial Join) (analysis)
+    Population_TT_Bu_SpatialJoin = "C:\\Users\\shashtar\\Desktop\\USA GIS files\\Mxds\\AccessDialysis\\MyProject3\\MyProject3.gdb\\Population_TT_Bu_SpatialJoin"
+    if int(Per_Capita) and Population_ID_Field and Provider_ID_field:
+        arcpy.analysis.SpatialJoin(target_features=Population_TT_Buffer_2_, join_features=First_Step_output, out_feature_class=Population_TT_Bu_SpatialJoin, field_mapping="AREA_ID \"AREA_ID\" true true false 21 Text 0 0,First,#,in_memory\\Population_TT_Buffer,AREA_ID,0,21;AREA_DESC \"AREA_DESC\" true true false 40 Text 0 0,First,#,in_memory\\Population_TT_Buffer,AREA_DESC,0,40;AREA_DESC2 \"AREA_DESC2\" true true false 40 Text 0 0,First,#,in_memory\\Population_TT_Buffer,AREA_DESC2,0,40;AREA_DESC3 \"AREA_DESC3\" true true false 254 Text 0 0,First,#,in_memory\\Population_TT_Buffer,AREA_DESC3,0,254;RING \"RING\" true true false 10 Long 0 10,First,#,in_memory\\Population_TT_Buffer,RING,-1,-1;RING_DEFN \"RING_DEFN\" true true false 20 Text 0 0,First,#,in_memory\\Population_TT_Buffer,RING_DEFN,0,20;STORE_LAT \"STORE_LAT\" true true false 19 Double 0 0,First,#,in_memory\\Population_TT_Buffer,STORE_LAT,-1,-1;STORE_LON \"STORE_LON\" true true false 19 Double 0 0,First,#,in_memory\\Population_TT_Buffer,STORE_LON,-1,-1;GEOID \"GEOID\" true true false 11 Text 0 0,First,#,in_memory\\Population_TT_Buffer,GEOID,0,11;Totalpop \"Totalpop\" true true false 10 Long 0 10,First,#,in_memory\\Population_TT_Buffer,Totalpop,-1,-1;WeightedPo \"WeightedPo\" true true false 10 Long 0 10,First,#,in_memory\\Population_TT_Buffer,WeightedPo,-1,-1;PopID \"PopID\" true true false 10 Long 0 10,First,#,in_memory\\Population_TT_Buffer,PopID,-1,-1;ORIG_FID \"ORIG_FID\" true true false 10 Long 0 10,First,#,in_memory\\Population_TT_Buffer,ORIG_FID,-1,-1;zPopulationBuffID \"ZPopulationBuffID\" true true false 0 Long 0 0,First,#,in_memory\\Population_TT_Buffer,zPopulationBuffID,-1,-1;Capacity \"Capacity\" true true false 10 Long 0 10,First,#,in_memory\\HealthServices_Exported,Capacity,-1,-1;zServiceID \"zserviceid\" true true false 0 Long 0 0,First,#,in_memory\\HealthServices_Exported,zServiceID,-1,-1;zCapacity_copy \"zcapacity_copy\" true true false 0 Double 0 0,First,#,in_memory\\HealthServices_Exported,zCapacity_copy,-1,-1;FinalIndex \"finalindex\" true true false 0 Double 0 0,Sum,#,in_memory\\HealthServices_Exported,FinalIndex,-1,-1;zPop_field \"zPop_field\" true true false 0 Long 0 0,First,#,in_memory\\HealthServices_Exported,zPop_field,-1,-1")
+
+    # Process: Join Field (2) (Join Field) (management)
+    if int(Per_Capita) and Population_ID_Field and Provider_ID_field:
+        Population_copy_6_ = arcpy.management.JoinField(in_data=Population_copy_7_, in_field="zPop_id", join_table=Population_TT_Bu_SpatialJoin, join_field="zPopulationBuffID", fields=["FinalIndex"])[0]
+
+    # Process: Delete Temporary fields (Delete Field) (management)
+    if int(Per_Capita) and Population_ID_Field and Provider_ID_field:
+        Population_copy_5_ = arcpy.management.DeleteField(in_table=Population_copy_6_, drop_field=["zPop_id", "zPop_field"])[0]
+
+    # Process: Copy Features (3) (Copy Features) (management)
+    if int(Per_Capita) and Population_ID_Field and Provider_ID_field:
+        arcpy.management.CopyFeatures(in_features=Population_copy_5_, out_feature_class=Output_File.__str__().format(**locals(),**globals()))
+
+    # Process: Get_Field_Value_2_ (Get Field Value) 
+    # Get Field Value Utility is not implemented 
+
+    # Process: Get_Field_Value_4_ (Get Field Value) 
+    # Get Field Value Utility is not implemented 
+
+    # Process: Get_Field_Value (Get Field Value) 
+    # Get Field Value Utility is not implemented 
+
+    # Process: Get_Field_Value_5_ (Get Field Value) 
+    # Get Field Value Utility is not implemented 
+
+if __name__ == '__main__':
+    # Global Environment settings
+    with arcpy.EnvManager():
+        Classic2SFCA2(*argv[1:])
