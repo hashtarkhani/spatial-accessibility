@@ -1,0 +1,28 @@
+
+import arcpy
+from sys import argv
+
+def Classic2SFCA01(Provider_data, ID_Field, Population_data, ID_Field_, Distance_Type="Driving Time", Distance_2SFCA_one_value_E2SFCA_3_values_=[10], Distance_Units="MINUTES", Time_of_Day="5/20/2023 4:00:00 PM", Travel_Direction="AWAY_FROM_STORES", Provider_TravelTimeBuffer, Population_TravelTimeBuffer):  # Create travel time catchment areas (for 2SFCA02 and E2SFCA02)
+
+    # To allow overwriting outputs change overwriteOutput option to True.
+    arcpy.env.overwriteOutput = False
+
+    # Check out any necessary licenses.
+    arcpy.CheckOutExtension("BusinessPrem")
+    arcpy.CheckOutExtension("Business")
+
+
+    # Process: Generate Drive Time Trade Areas (Generate Drive Time Trade Areas) (ba)
+    arcpy.ba.GenerateDriveTimeTradeArea(in_features=Provider_data.__str__().format(**locals(),**globals()), out_feature_class=Provider_TravelTimeBuffer.__str__().format(**locals(),**globals()), distance_type=Distance_Type.__str__().format(**locals(),**globals()), distances=Distance_2SFCA_one_value_E2SFCA_3_values_.__str__().format(**locals(),**globals()), units=Distance_Units.__str__().format(**locals(),**globals()), id_field=ID_Field.__str__().format(**locals(),**globals()), travel_direction=Travel_Direction.__str__().format(**locals(),**globals()), time_of_day=Time_of_Day.__str__().format(**locals(),**globals()), polygon_detail="GENERALIZED")
+
+    # Process: Feature To Point (Feature To Point) (management)
+    Output_Feature_Class_3_ = ""
+    arcpy.management.FeatureToPoint(in_features=Population_data.__str__().format(**locals(),**globals()), out_feature_class=Output_Feature_Class_3_)
+
+    # Process: Generate Drive Time Trade Areas (2) (Generate Drive Time Trade Areas) (ba)
+    arcpy.ba.GenerateDriveTimeTradeArea(in_features=Output_Feature_Class_3_, out_feature_class=Population_TravelTimeBuffer.__str__().format(**locals(),**globals()), distance_type=Distance_Type.__str__().format(**locals(),**globals()), distances=Distance_2SFCA_one_value_E2SFCA_3_values_.__str__().format(**locals(),**globals()), units=Distance_Units.__str__().format(**locals(),**globals()), id_field=ID_Field_.__str__().format(**locals(),**globals()), travel_direction=Travel_Direction.__str__().format(**locals(),**globals()), time_of_day=Time_of_Day.__str__().format(**locals(),**globals()), polygon_detail="GENERALIZED")
+
+if __name__ == '__main__':
+    # Global Environment settings
+    with arcpy.EnvManager():
+        Classic2SFCA01(*argv[1:])
